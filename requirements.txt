@@ -1,0 +1,10 @@
+numpy<2
+pandas
+torch
+tqdm
+psycopg[binary]
+psycopg2-binary
+scikit-learn
+xgboost
+pymysql
+torch_geometric

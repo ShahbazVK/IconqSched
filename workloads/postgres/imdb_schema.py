@@ -186,7 +186,7 @@ create index mi_idx_movie_id_btree_index on movie_info_idx using btree(movie_id)
 create index mi_idx_info_type_id_btree_index on movie_info_idx using btree(info_type_id);
 create index mc_company_id_index on movie_companies using btree (company_id);
 create index mc_movie_id_btree_index on movie_companies using btree(movie_id);
-create index mc_company_type_id_index on movi44e_companies using btree(company_type_id);
+create index mc_company_type_id_index on movie_companies using btree(company_type_id);
 create index mk_movie_id_btree_index on movie_keyword using btree(movie_id);
 create index mk_keyword_id_btree_index on movie_keyword using btree(keyword_id);
 create index ci_movie_id_btree_index on cast_info using btree(movie_id);
@@ -198,4 +198,5 @@ IMDB_TABLE_NAMES: List[str] = ["aka_name", "aka_title", "cast_info", "char_name"
                                "movie_companies", "movie_info_idx", "movie_keyword", "movie_link", "name",
                                "role_type", "title", "movie_info", "person_info"]
 
-IMDB_LOAD_TEMPLATE: str = "\copy {table_name} from '{path}' with DELIMITER ''|'' CSV header;"
+# JOB imdb.tgz CSVs are comma-separated (not pipe). Default CSV format uses comma delimiter.
+IMDB_LOAD_TEMPLATE: str = r"\copy {table_name} from '{path}' with (format csv, header true);"

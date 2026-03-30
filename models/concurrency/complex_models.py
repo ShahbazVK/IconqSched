@@ -176,7 +176,16 @@ class ConcurrentRNN:
     ):
         if loss_function is not None:
             self.loss_func = loss_function
-        predictions = self.stage_model.cache.running_average
+        # Use the full per-query predictions map when available.
+        # `cache.running_average` only contains query ids seen in the training split
+        # and can miss ids referenced by concurrent context in val/train featurization.
+        if (
+            hasattr(self.stage_model, "predictions")
+            and self.stage_model.predictions is not None
+        ):
+            predictions = self.stage_model.predictions
+        else:
+            predictions = self.stage_model.cache.running_average
         single_query_features = self.stage_model.all_feature
 
         if val_on_test:
