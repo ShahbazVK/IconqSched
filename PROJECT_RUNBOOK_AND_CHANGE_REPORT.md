@@ -226,13 +226,13 @@ export NUMEXPR_NUM_THREADS=1
 Example connectivity check:
 
 ```bash
-psql "host=127.0.0.1 port=5432 dbname=imdb user=nizarnoorani" -c "\conninfo"
+psql "host=127.0.0.1 port=5432 dbname=imdb user=<db-user>" -c "\conninfo"
 ```
 
 Placeholder note:
 
 - Replace placeholders with real values before running commands.
-- Do **not** paste `nizarnoorani`, `<K>`, `<SEED>` literally in zsh.
+- Do **not** paste `<db-user>`, `<K>`, `<SEED>` literally in zsh.
 
 ---
 
@@ -256,7 +256,7 @@ cd <repo-root>
 python utils/load_database.py \
   --schema-only \
   --no-drop \
-  --user nizarnoorani \
+  --user <db-user> \
   --password '' \
   --database imdb
 ```
@@ -264,7 +264,7 @@ python utils/load_database.py \
 If tables already exist, either keep them or reset public schema intentionally:
 
 ```bash
-python utils/load_database.py --schema-only --no-drop --reset-public-schema --user nizarnoorani --password '' --database imdb
+python utils/load_database.py --schema-only --no-drop --reset-public-schema --user <db-user> --password '' --database imdb
 ```
 
 ---
@@ -273,7 +273,7 @@ python utils/load_database.py --schema-only --no-drop --reset-public-schema --us
 
 ```bash
 python utils/load_imdb_csvs_python.py \
-  --host 127.0.0.1 --port 5432 --user nizarnoorani --password '' \
+  --host 127.0.0.1 --port 5432 --user <db-user> --password '' \
   --database imdb \
   --data-dir <data-dir>
 ```
@@ -281,7 +281,7 @@ python utils/load_imdb_csvs_python.py \
 Verify:
 
 ```bash
-psql "host=127.0.0.1 port=5432 dbname=imdb user=nizarnoorani" -c "SELECT COUNT(*) FROM title;"
+psql "host=127.0.0.1 port=5432 dbname=imdb user=<db-user>" -c "SELECT COUNT(*) FROM title;"
 ```
 
 ---
@@ -311,7 +311,7 @@ python run.py \
   --warmup_run \
   --database postgres \
   --save_result_dir saved_results \
-  --host 127.0.0.1 --port 5432 --user nizarnoorani --password '' \
+  --host 127.0.0.1 --port 5432 --user <db-user> --password '' \
   --db_name imdb \
   --query_bank_path workloads/postgres/brad_queries_normalized.sql \
   --timeout_s 1000
@@ -328,7 +328,7 @@ python run.py \
   --scheduler_type None \
   --database postgres \
   --save_result_dir saved_results \
-  --host 127.0.0.1 --port 5432 --user nizarnoorani --password '' \
+  --host 127.0.0.1 --port 5432 --user <db-user> --password '' \
   --db_name imdb \
   --query_bank_path workloads/postgres/brad_queries_normalized.sql \
   --num_clients 4 \
@@ -391,7 +391,7 @@ python run.py \
   --scheduler_type None \
   --database postgres \
   --save_result_dir saved_results \
-  --host 127.0.0.1 --port 5432 --user nizarnoorani --password '' \
+  --host 127.0.0.1 --port 5432 --user <db-user> --password '' \
   --db_name imdb \
   --query_bank_path workloads/postgres/brad_queries_normalized.sql \
   --num_clients <K> \
@@ -410,7 +410,7 @@ python run.py \
   --target_path models/_checkpoints \
   --rnn_type bilstm \
   --save_result_dir saved_results \
-  --host 127.0.0.1 --port 5432 --user nizarnoorani --password '' \
+  --host 127.0.0.1 --port 5432 --user <db-user> --password '' \
   --db_name imdb \
   --query_bank_path workloads/postgres/brad_queries_normalized.sql \
   --num_clients <K> \
@@ -702,7 +702,7 @@ If line count increases over time, warmup is progressing.
 - Check DB activity:
 
 ```bash
-psql "host=127.0.0.1 port=5432 dbname=imdb user=nizarnoorani" -c "select now(),state,wait_event_type,wait_event,left(query,120) from pg_stat_activity where datname='imdb' and state<>'idle';"
+psql "host=127.0.0.1 port=5432 dbname=imdb user=<db-user>" -c "select now(),state,wait_event_type,wait_event,left(query,120) from pg_stat_activity where datname='imdb' and state<>'idle';"
 ```
 
 - Use single-thread env vars for stability:
