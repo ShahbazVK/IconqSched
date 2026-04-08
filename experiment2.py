@@ -25,6 +25,7 @@ import glob
 import argparse
 import numpy as np
 import pandas as pd
+from scipy import stats as scipy_stats
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -175,6 +176,62 @@ def save_summary_csv(stats: dict, output_dir: str):
     return df
 
 
+# ── statistical test: paired t-test ─────────────────────────────────────────────────────────────────────
+def run_paired_ttest(results_dir: str, k: int, seeds: list, output_dir: str):
+    """
+    Run paired t-test comparing FIFO vs IconqSched mean e2e-time per seed.
+    Saves results to experiment2_ttest.csv
+    """
+    fifo_means = []
+    ours_means = []
+ 
+    for seed in seeds:
+        fifo_path = os.path.join(results_dir, f"exp_k{k}_seed{seed}_baseline.csv")
+        ours_path = os.path.join(results_dir, f"exp_k{k}_seed{seed}_ours.csv")
+        if os.path.exists(fifo_path) and os.path.exists(ours_path):
+            f_e2e, _, _, _ = load_csv_results(fifo_path)
+            o_e2e, _, _, _ = load_csv_results(ours_path)
+            if len(f_e2e) > 0 and len(o_e2e) > 0:
+                fifo_means.append(float(np.mean(f_e2e)))
+                ours_means.append(float(np.mean(o_e2e)))
+ 
+    print("\n" + "="*60)
+    print("  PAIRED T-TEST — FIFO vs IconqSched")
+    print("="*60)
+ 
+    if len(fifo_means) < 2:
+        print("  Not enough seeds for t-test (need at least 2)")
+        return
+ 
+    t_stat, p_value = scipy_stats.ttest_rel(fifo_means, ours_means)
+    significant = p_value < 0.05
+ 
+    print(f"  Seeds used:       {len(fifo_means)}")
+    print(f"  FIFO means:       {[round(x,3) for x in fifo_means]}")
+    print(f"  IconqSched means: {[round(x,3) for x in ours_means]}")
+    print(f"  t-statistic:      {t_stat:.4f}")
+    print(f"  p-value:          {p_value:.4f}")
+    print(f"  Significant:      {'Yes (p < 0.05)' if significant else 'No (p >= 0.05)'}")
+ 
+    if not significant:
+        print("  Note: improvement exists but not statistically significant")
+        print("        with only 3 seeds. More seeds would strengthen this result.")
+ 
+    ttest_df = pd.DataFrame([{
+        "comparison":   "FIFO vs IconqSched",
+        "n_seeds":      len(fifo_means),
+        "t_statistic":  round(t_stat, 4),
+        "p_value":      round(p_value, 4),
+        "significant":  significant,
+        "fifo_means":   str([round(x,3) for x in fifo_means]),
+        "ours_means":   str([round(x,3) for x in ours_means]),
+    }])
+    os.makedirs(output_dir, exist_ok=True)
+    path = os.path.join(output_dir, "experiment2_ttest.csv")
+    ttest_df.to_csv(path, index=False)
+    print(f"  T-test results saved to {path}")
+
+
 # ── main ─────────────────────────────────────────────────────────────────────
 
 def main(args):
@@ -250,6 +307,9 @@ def main(args):
         print(f"    Mean e2e improvement: {pct_mean:.1f}%")
         print(f"    p90  e2e improvement: {pct_p90:.1f}%")
 
+    # ── Paired t-test ─────────────────────────────────────────────────────────
+    run_paired_ttest(args.results_dir, args.k, seeds, args.output_dir)
+
     # ── Save and plot ──────────────────────────────────────────────────────────
     summary_df = save_summary_csv(stats, args.output_dir)
     print(summary_df.to_string(index=False))
@@ -268,4 +328,4 @@ if __name__ == "__main__":
     parser.add_argument("--output_dir", default="results/experiment2", type=str)
     args = parser.parse_args()
     main(args)
-    
+  
