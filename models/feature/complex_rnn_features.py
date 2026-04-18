@@ -183,24 +183,21 @@ def featurize_queries_complex_online(
                         else:
                             x = []
                             for k in range(len(existing_query_concur_features[i])):
-                                k_query_feature = existing_query_concur_features[i][j][
+                                k_query_feature = existing_query_concur_features[i][k][
                                     (l_feature + 2) : (2 * l_feature + 2)
                                 ]
                                 is_finished = False
                                 for finished_query_feature in finished_query_features:
-                                    if (
-                                        not torch.sum(
-                                            torch.abs(
-                                                k_query_feature - finished_query_feature
-                                            )
+                                    if torch.sum(
+                                        torch.abs(
+                                            k_query_feature - finished_query_feature
                                         )
-                                        <= 1e-4
-                                    ):
+                                    ) <= 1e-4:
                                         # remove the finished query from its concurrent feature
                                         is_finished = True
                                         break
                                 if not is_finished:
-                                    x.append(existing_query_concur_features[i][j])
+                                    x.append(existing_query_concur_features[i][k])
                             x.append(torch.FloatTensor(concur_query_feature))
                             x = torch.stack(x)
                     else:

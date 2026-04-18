@@ -1,5 +1,7 @@
 numpy<2
 pandas
+matplotlib
+scipy
 torch
 tqdm
 psycopg[binary]

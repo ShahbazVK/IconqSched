@@ -287,7 +287,11 @@ class BiLSTM(nn.Module):
         if pre_info_length is None:
             output = output[torch.arange(len(x_len)), x_len - 1]
         else:
-            output = output[torch.arange(len(x_len)), pre_info_length - 1]
+            # Guard against malformed pre-info lengths in online scheduling.
+            # Keep indices in [1, sequence_len] so we never index out of bounds.
+            safe_pre_info_length = torch.minimum(pre_info_length, x_len)
+            safe_pre_info_length = torch.clamp(safe_pre_info_length, min=1)
+            output = output[torch.arange(len(x_len)), safe_pre_info_length - 1]
         output = self.output_layer(output)
         return output
 
