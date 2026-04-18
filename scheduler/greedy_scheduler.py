@@ -62,14 +62,9 @@ class GreedyScheduler(BaseScheduler):
         if simulation:
             self.finish_query_simulation()
         else:
-            # adjusting the finishing time of running queries (due to error in estimation)
+            # Keep runtime adjustment deterministic in live mode.
+            # Random perturbation here can destabilize scheduling decisions across seeds.
             for i in range(len(self.existing_finish_time)):
-                if self.existing_finish_time[i] < self.current_time + 3:
-                    randomness = np.abs(np.random.normal(0.1, 0.05)) + 0.05
-                    self.existing_finish_time[i] = (
-                        self.current_time
-                        + randomness * self.existing_runtime_prediction[i]
-                    )
                 if (
                     self.current_time - self.existing_start_time[i]
                     > self.existing_runtime_prediction_adjusted[i]
@@ -328,12 +323,39 @@ class GreedyScheduler(BaseScheduler):
                         if score is not None:
                             print(f"----------------Score: {score}------------")
             if len(all_score) == 0:
-                should_immediate_re_ingest = False
+                # Fallback: do not idle when candidates were filtered out.
+                # Submit the shortest predicted queued query to keep throughput moving.
+                predictions_query = predictions[
+                    ::prediction_len_per_query
+                ]
+                selected_idx = int(np.argmin(predictions_query))
+                curr_pred_runtime = float(predictions_query[selected_idx])
+                finish_t = start_t + curr_pred_runtime
+                queueing_time = max(
+                    start_t - self.queued_queries_enter_time[selected_idx], 0.1
+                )
+                scheduled_submit = (
+                    copy.deepcopy(self.queued_queries[selected_idx]),
+                    copy.deepcopy(self.queued_queries_sql[selected_idx]),
+                    copy.deepcopy(self.queued_queries_index[selected_idx]),
+                    queueing_time,
+                )
+                self.submit_query(
+                    selected_idx,
+                    self.queued_queries[selected_idx],
+                    curr_pred_runtime,
+                    self.queued_query_features[selected_idx],
+                    start_t,
+                    self.queued_queries_enter_time[selected_idx],
+                    finish_t,
+                    None,
+                    int(global_pre_info_length[selected_idx * prediction_len_per_query]),
+                )
+                should_immediate_re_ingest = True
                 should_pause_and_re_ingest = False
-                scheduled_submit = None
             else:
-                # TODO: use linear programming rather than argmax
-                best_query_idx = np.argmin(all_score)
+                # Higher score indicates better submit-now benefit.
+                best_query_idx = np.argmax(all_score)
                 selected_idx = all_query_idx[best_query_idx]
                 converted_idx = selected_idx * prediction_len_per_query
                 curr_pred_runtime = predictions[converted_idx]
