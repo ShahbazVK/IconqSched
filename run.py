@@ -1,6 +1,7 @@
 import argparse
 import os.path
 import asyncio
+import shutil
 from typing import Union, Tuple, Optional
 import pandas as pd
 import numpy as np
@@ -90,6 +91,7 @@ def minic_snowset_workload(
 
 def train_concurrent_rnn() -> None:
     train_trace_df, eval_trace_df = load_workload(train_test_split=True)
+    print("Starting stage model featurization and training...")
     ss = SingleStage(
         use_size=args.true_card,
         use_log=args.use_log,
@@ -100,11 +102,16 @@ def train_concurrent_rnn() -> None:
     )
     df = ss.featurize_data(train_trace_df, args.parsed_queries_path)
     ss.train(df)
+    print("Stage model training complete.")
     with open(
         os.path.join(args.target_path, f"{args.model_name}_stage_model.pkl"), "wb"
     ) as f:
         pkl.dump(ss, f)
+    print(
+        f"Saved stage model to {os.path.join(args.target_path, f'{args.model_name}_stage_model.pkl')}"
+    )
 
+    print("Starting concurrent RNN training...")
     rnn = ConcurrentRNN(
         ss,
         model_prefix=args.model_name,
@@ -125,8 +132,10 @@ def train_concurrent_rnn() -> None:
         val_on_test=args.val_on_test,
         epochs=args.epochs,
     )
+    print("Concurrent RNN training complete.")
     if args.target_path is not None:
         rnn.save_model(args.target_path)
+        print(f"Saved concurrent RNN model under {args.target_path}")
 
 
 def load_concurrent_rnn_stage_model(
@@ -340,6 +349,8 @@ def run_k_client_in_parallel(
         timeout=args.timeout_s,
         database=args.database,
         scheduler=scheduler,
+        # Faster polling avoids artificial wait inflation in scheduler runs.
+        pause_wait_s=0.1,
         debug=args.debug,
         logger=verbose_logger,
     )
@@ -354,6 +365,20 @@ def run_k_client_in_parallel(
             seed=args.seed,
         )
     )
+    mode = "baseline" if args.baseline else "ours"
+    src = os.path.join(
+        save_result_dir, f"clients_{num_clients}_timeout_{args.timeout_s}_{mode}.csv"
+    )
+    dst = os.path.join(
+        save_result_dir, f"exp_k{num_clients}_seed{args.seed}_{mode}.csv"
+    )
+    if os.path.exists(src):
+        shutil.copy2(src, dst)
+        print(f"Saved seed snapshot: {dst}")
+    else:
+        print(
+            f"Warning: expected result file not found, skip snapshot copy: {src}"
+        )
 
 
 if __name__ == "__main__":
