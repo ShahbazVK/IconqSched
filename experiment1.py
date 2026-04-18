@@ -56,13 +56,13 @@ def print_metrics(name: str, q_error: np.ndarray, abs_error: np.ndarray):
           f"p95: {np.percentile(abs_error, 95):.4f}s")
 
 
-def heuristic_predict(df: pd.DataFrame) -> np.ndarray:
-    """Predict average runtime per query template (heuristic baseline)."""
-    avg_by_idx = df.groupby("query_idx")["runtime"].mean().to_dict()
-    overall_avg = df["runtime"].mean()
+def heuristic_predict(train_df: pd.DataFrame, test_df: pd.DataFrame) -> np.ndarray:
+    """Predict test runtime using train-only average runtime per query template."""
+    avg_by_idx = train_df.groupby("query_idx")["runtime"].mean().to_dict()
+    overall_avg = train_df["runtime"].mean()
     preds = np.array([
         avg_by_idx.get(int(row["query_idx"]), overall_avg)
-        for _, row in df.iterrows()
+        for _, row in test_df.iterrows()
     ])
     return preds
 
@@ -219,7 +219,7 @@ def main(args):
 
     # ── 7. Heuristic baseline ─────────────────────────────────────────────────
     print("\nRunning heuristic baseline (average runtime per template)...")
-    heur_preds  = heuristic_predict(test_df)
+    heur_preds  = heuristic_predict(train_df, test_df)
     heur_labels = test_df["runtime"].values
     heur_q, heur_a = compute_metrics(heur_preds, heur_labels)
     print_metrics("Heuristic (avg per template)", heur_q, heur_a)
@@ -284,7 +284,12 @@ if __name__ == "__main__":
     parser.add_argument("--target_path",   default="models/_checkpoints", type=str)
     parser.add_argument("--directory",     required=True, type=str,
                         help="Directory containing saved_results CSV files for training traces")
-    parser.add_argument("--parsed_queries_path", required=True, type=str)
+    parser.add_argument(
+        "--parsed_queries_path",
+        default=None,
+        type=str,
+        help="Deprecated/unused argument kept for backward-compatible CLI calls.",
+    )
     parser.add_argument("--rnn_type",      default="bilstm", type=str)
     parser.add_argument("--embedding_dim", default=128, type=int)
     parser.add_argument("--hidden_size",   default=256, type=int)

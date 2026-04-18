@@ -21,7 +21,6 @@ Usage:
 
 import os
 import sys
-import glob
 import argparse
 import numpy as np
 import pandas as pd
@@ -41,22 +40,24 @@ def load_csv_results(path: str):
     Filters out rows with errors or timeouts before computing metrics.
     """
     df = pd.read_csv(path)
+    raw_df = df.copy()
 
-    # filter out errors and timeouts
+    def _as_bool_series(col: pd.Series) -> pd.Series:
+        return col.astype(str).str.strip().str.lower().isin({"1", "true", "t", "yes", "y"})
+
+    # count from raw data before filtering
+    n_timeouts = int(_as_bool_series(raw_df["timeout"]).sum()) if "timeout" in raw_df.columns else 0
+    n_errors = int(_as_bool_series(raw_df["error"]).sum()) if "error" in raw_df.columns else 0
+
+    # filter out errors and timeouts for metric computations
     if "error" in df.columns:
-        df = df[df["error"] != True]
-        df = df[df["error"] != "True"]
+        df = df[~_as_bool_series(df["error"])]
     if "timeout" in df.columns:
-        df = df[df["timeout"] != True]
-        df = df[df["timeout"] != "True"]
+        df = df[~_as_bool_series(df["timeout"])]
 
     # e2e-time is run_time_s, system runtime is exec_time
     e2e  = df["run_time_s"].values.astype(float)
     exec_t = df["exec_time"].values.astype(float) if "exec_time" in df.columns else e2e
-
-    # count before filtering for reporting
-    n_timeouts = int((df.get("timeout", pd.Series(dtype=bool)) == True).sum()) if "timeout" in df.columns else 0
-    n_errors   = int((df.get("error",   pd.Series(dtype=bool)) == True).sum()) if "error"   in df.columns else 0
 
     # keep only positive runtimes
     valid = (e2e > 0) & (exec_t > 0)
@@ -71,19 +72,19 @@ def collect_seed_results(results_dir: str, k: int, seeds: list, mode: str):
     all_e2e = []
     found = []
     for seed in seeds:
-        pattern = os.path.join(results_dir, f"exp_k{k}_seed{seed}_{mode}.csv")
-        matches = glob.glob(pattern)
-        if not matches:
-            # also try the default naming from run.py
-            pattern2 = os.path.join(results_dir, f"clients_{k}_timeout_*_{mode}.csv")
-            matches = glob.glob(pattern2)
-        if matches:
-            path = matches[0]
+        path = os.path.join(results_dir, f"exp_k{k}_seed{seed}_{mode}.csv")
+        if os.path.exists(path):
             e2e, _, n_to, n_err = load_csv_results(path)
             all_e2e.append(e2e)
-            found.append(f"seed {seed}: {len(e2e)} queries, {n_to} timeouts, {n_err} errors")
+            found.append(
+                f"seed {seed}: {len(e2e)} queries, {n_to} timeouts, {n_err} errors "
+                f"(file: {os.path.basename(path)})"
+            )
         else:
-            print(f"  Warning: no file found for k={k} seed={seed} mode={mode}")
+            print(
+                f"  Warning: missing {os.path.basename(path)}. "
+                "Use explicit per-seed files to avoid accidental duplicates."
+            )
     if found:
         for msg in found:
             print(f"  {mode}: {msg}")
@@ -215,7 +216,10 @@ def run_paired_ttest(results_dir: str, k: int, seeds: list, output_dir: str):
  
     if not significant:
         print("  Note: improvement exists but not statistically significant")
-        print("        with only 3 seeds. More seeds would strengthen this result.")
+        print(
+            f"        with {len(fifo_means)} seeds. "
+            "More seeds would strengthen this result."
+        )
  
     ttest_df = pd.DataFrame([{
         "comparison":   "FIFO vs IconqSched",
