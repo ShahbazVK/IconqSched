@@ -1,0 +1,2 @@
+comparison,n_seeds,t_statistic,p_value,significant,fifo_means,ours_means
+FIFO vs IconqSched,8,0.2171,0.8343,False,"[2.77, 2.919, 3.066, 2.773, 2.168, 2.507, 2.788, 2.78]","[2.476, 3.427, 2.149, 2.483, 2.362, 2.796, 2.754, 3.046]"
