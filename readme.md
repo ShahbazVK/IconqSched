@@ -1,129 +1,159 @@
-# IconqSched
+# CS 6360 Project - IconqSched Reproduction: Bi-LSTM Based Concurrent Query Scheduling
 
+Reproduction of IconqSched from Z. Wu et al. 2025 (VLDB). 
 
-## Training Iconq concurrent runtime predictor
-You can find the saved checkpoints in models/_checkpoints and skip the part on collecting training data and training
+Our project evaluates Iconq bi-LSTM prediction accuracy and IconqSched greedy scheduling performance on local PostgreSQL 16 using the IMDB JOB dataset with BRAD queries at a reduced scale of ~10 GB compared to the paper's 160 GB configuration. 
 
-### Collecting the training data
-In this work we use the IMDB dataset (scaled to 100GB) and the queries used in BRAD paper: https://github.com/mitdbg/brad.
-We also used the Cloud Analytic Benchmark based on TPC-H: https://github.com/alexandervanrenen/cab.
+---
 
-A subset of these queries can be found in workloads/postgres/{workload_name}_queries.sql and workloads/redshift/
-We also included the parsed query plans for these queries (e.g., {workload_name}_parsed_query_plans.json). 
+## Setup
 
-Example workload traces are provided in workloads/postgres/{snowset or tpc_sf}_query_trace.csv
-For BRAD workload, you can replay other traces using workloads/workload_tools (you can execute python3 run.py --minic_snowset_workload).
-For CAB workload, you can modify cab/benchmark-gen to generate different traces.
+### Requirements
+- Python 3.11
+- PostgreSQL 16
+- IMDB JOB dataset loaded into local Postgres
 
-The script parser/parse_plan.py invokes the Postgres/Redshift "EXPLAIN" function and parses the outputs, 
-you can execute python3 run.py --parse_explain with appropriate arguments
-
-utils/load_database.py provides instructions on loading the tpc/imdb data into your Postgres/Redshift clusters.
-
-After loading the tables (which may take a couple hours depending on cluster sizes), you should first warmup your cluster
-
-```angular2html
-mkdir saved_results
-python3 run.py \
-      --warmup_run \
-      --database postgres \
-      --save_result_dir saved_results \
-      --host 'postgres-imdb.xxxxx.rds.amazonaws.com' \
-      --port 5432 \
-      --user xxx \
-      --password xxx \
-      --db_name imdb \
-      --query_bank_path workloads/postgres/brad_queries.sql \
-      --timeout 1000 \
-```
-Change --database and --query_bank_path to corresponding workload and engines.
-
-After warming up, execute k clients issuing the queries in a close loop
-```angular2html
-python3 run.py \
-      --run_k_client_in_parallel \
-      --baseline \
-      --database postgres \
-      --save_result_dir saved_results \
-      --host 'postgres-imdb.xxxxx.rds.amazonaws.com' \
-      --port 5432 \
-      --user xxx \
-      --password xxx \
-      --db_name imdb \
-      --query_bank_path workloads/postgres/brad_queries.sql \
-      --num_clients $k$ \
-      --timeout 1000 \
-      --scheduler_type None
-```
-Vary k with different values or set --num_clients_list for a list of clients.
-Change --query_bank_path and --db_name for TPC_H.
-Change --query_bank_path and --database and the connection strings to for RedShift.
-
-### Training Iconq
-```angular2html
-python3 run.py \
-      --train_concurrent_rnn \
-      --model_name postgres_brad \
-      --directory saved_results \
-      --parsed_queries_path workloads/postgres/brad_parsed_query_plans.json \
-      --target_path models/_checkpoints \
-      --rnn_type bilstm \
-      --use_size \
-      --use_log \
-      --use_table_features \
-      --ignore_short_running 
-```
---directory specifies a directory with all training data files, e.g., the .csv files generated from previous step.
-            You can also set --directory to a specific csv file path to be trained only on one file.
-Change --model_name to 'redshift_{brad or cab}' and --directory for training a cost model on redshift.
-
-
-## Testing the IconqSched's scheduling performance
-
-Execute the workload with the DBMS itself (--baseline)
-```angular2html
-python3 run.py \
-      --replay_workload \
-      --baseline \
-      --database postgres \
-      --directory workloads/postgres/snowset_1453912639619907921_postgres_replay.csv \
-      --save_result_dir saved_results \
-      --host 'postgres-imdb.xxxxx.rds.amazonaws.com' \
-      --port 5432 \
-      --user xxx \
-      --password xxx \
-      --db_name imdb \
-      --query_bank_path workloads/postgres/brad_queries.sql \
-      --timeout 1000
-```
-Change the --database and --query_bank_path to test on Redshift. 
-Change the --target_path, --query_bank_path and --directory to test on TPC-H CAB benchmarks. 
-
-Execute the workload with the IconqSched
-```angular2html
-python3 run.py \
-      --replay_workload \
-      --database postgres \
-      --model_name postgres_brad \
-      --rnn_type bilstm \
-      --directory workloads/postgres/snowset_1453912639619907921_postgres_replay.csv \
-      --target_path models/_checkpoints \
-      --save_result_dir saved_results \
-      --host 'postgres-imdb.xxxxx.rds.amazonaws.com' \
-      --port 5432 \
-      --user xxx \
-      --password xxx \
-      --db_name imdb \
-      --query_bank_path workloads/postgres/queries.sql \
-      --debug \
-      --ignore_short_running \
-      --timeout 1000
+### Environment Setup: Install dependencies
+```bash
+cd <repo-root>
+python3 -m venv .venv
+source .venv/bin/activate        # Mac/Linux
+.venv\Scripts\activate           # Windows
+pip install -r requirements.txt
 ```
 
-Change the --scheduler_type to 'lp' or 'qshuffler' to test on baselines. Note that the baselines also need to be trained first.
-We tuned the hyper-parameters of IconqSched and other baselines by varying the --steps_into_future, --short_running_threshold, 
---alpha and --starve_penalty on each workload and engine. The numbers reported in the paper are the best tuned results.
+---
+## Postgres + Dataset Setup
 
+Check DB:
 
+```bash
+psql "host=127.0.0.1 port=5432 dbname=imdb user=<user>" -c "\conninfo"
+```
 
+Download JOB dataset:
 
+```bash
+cd <download-dir>
+curl -fL -o imdb.tgz "https://event.cwi.nl/da/job/imdb.tgz"
+tar -xzf imdb.tgz
+ls <data-dir>/*.csv | wc -l
+```
+
+Create schema:
+
+```bash
+cd <repo-root>
+python utils/load_database.py --schema-only --no-drop --user <user> --password <password> --database imdb
+```
+
+Load CSV data:
+
+```bash
+python utils/load_imdb_csvs_python.py --host 127.0.0.1 --port 5432 --user <user> --password <password> --database imdb --data-dir <data-dir>
+```
+
+---
+
+## Running the Pipeline
+
+Follow these steps in order on one designated machine.
+
+### 1. Warmup (Run once)
+
+```bash
+mkdir -p saved_results
+python run.py --warmup_run --database postgres --save_result_dir saved_results --host 127.0.0.1 --port 5432 --user <user> --password <password> --db_name imdb --query_bank_path workloads/postgres/brad_queries_normalized.sql --timeout_s 1000
+```
+
+Expected: `saved_results/_timeout_1000_warmup_run.csv`
+
+### 2. Baseline seeds (K=4)
+
+Use the same seeds each cycle:
+
+```bash
+for SEED in 11 12 13 21 22 23 24 25; do
+  echo "=== Baseline seed ${SEED} ==="
+  python -u run.py --run_k_client_in_parallel --baseline --scheduler_type None --database postgres --save_result_dir saved_results --host 127.0.0.1 --port 5432 --user <user> --password <password> --db_name imdb --query_bank_path workloads/postgres/brad_queries_normalized.sql --num_clients 4 --timeout_s 120 --exec_for_s 300 --seed "${SEED}"
+done
+```
+
+Auto-snapshots are created automatically (`exp_k4_seed*_baseline.csv`).
+
+### 3. Build clean training folder
+```bash
+rm -rf training_traces_baseline_k4
+mkdir -p training_traces_baseline_k4
+for SEED in 11 12 13 21 22 23 24 25; do
+  cp "saved_results/exp_k4_seed${SEED}_baseline.csv" training_traces_baseline_k4/
+done
+```
+
+### 4. Train model
+
+```bash
+mkdir -p models/_checkpoints
+python -u run.py --train_concurrent_rnn --model_name postgres_brad --directory training_traces_baseline_k4 --parsed_queries_path workloads/postgres/brad_parsed_query_plans.json --target_path models/_checkpoints --rnn_type bilstm --use_size --use_log --use_table_features --epochs 30
+```
+
+Expected artifacts:
+
+- `models/_checkpoints/postgres_brad_stage_model.pkl`
+- `models/_checkpoints/postgres_brad_bilstm_256_2_q_loss_wo_sep`
+
+### 5. Run IconqSched seeds 
+
+Ours runs with same seeds and same configuration.
+Do not add `--debug` for timed comparisons.
+
+```bash
+for SEED in 11 12 13 21 22 23 24 25; do
+  echo "=== Ours seed ${SEED} ==="
+  python -u run.py --run_k_client_in_parallel --database postgres --model_name postgres_brad --target_path models/_checkpoints --rnn_type bilstm --save_result_dir saved_results --host 127.0.0.1 --port 5432 --user  <user> --password <password> --db_name imdb --query_bank_path workloads/postgres/brad_queries_normalized.sql --num_clients 4 --timeout_s 120 --exec_for_s 300 --scheduler_type greedy --seed "${SEED}"
+done
+```
+
+Auto-snapshots are created automatically (`exp_k4_seed*_ours.csv`).
+
+### 6. Run experiment scripts
+
+Experiment 1:
+
+```bash
+python experiment1.py --model_name postgres_brad --target_path models/_checkpoints --directory training_traces_baseline_k4 --rnn_type bilstm --output_dir results/experiment1_clean_k4
+```
+
+Experiment 2:
+
+```bash
+python experiment2.py --results_dir saved_results --k 4 --seeds 11 12 13 21 22 23 24 25 --output_dir results/experiment2_clean_k4
+```
+
+Note: `--seeds` must be space-separated integers (not comma-separated).
+
+---
+
+## Metrics
+
+**Experiment 1 — Predictor Accuracy**
+- Q-error: max(predicted/actual, actual/predicted) — closer to 1 is better
+- Absolute error: |predicted − actual| in seconds — closer to 0 is better
+- Both reported at p50, p90, and p95
+
+**Experiment 2 — End-to-End Scheduling**
+- Mean e2e-time: queuing time + system runtime per query
+- p90 e2e-time: tail latency at 90th percentile
+- Percentage improvement over FIFO: (FIFO − IconqSched) / FIFO × 100
+- Statistical test: paired t-test across 8 seeds, p < 0.05 threshold
+- Supplemental: p50 and p95 e2e-time
+
+---
+
+## Notes
+
+- Keep `num_clients=4`, `timeout_s=120`, `exec_for_s=300` identical for baseline and ours.
+- Use the same seed list for both baseline and ours runs.
+- Do not mix old CSVs into `training_traces_baseline_k4`.
+- Clear Postgres cache between runs for consistent results.
+- Do not mix checkpoint sets across Experiment1 and Experiment2 in one report cycle.
