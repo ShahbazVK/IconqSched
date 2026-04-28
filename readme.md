@@ -6,6 +6,20 @@ Our project evaluates Iconq bi-LSTM prediction accuracy and IconqSched greedy sc
 
 ---
 
+### Standard Workflow
+
+1. Setup environment and database.
+2. Warmup once.
+3. Run baseline seeds (K=4).
+4. Build clean training folder from baseline CSVs only.
+5. Train checkpoints.
+6. Run ours on the same seeds and same config.
+7. Run Exp1 and Exp2.
+
+Core rule: use one checkpoint set for both Experiment 1 and Experiment 2 in one report cycle.
+
+---
+
 ## Setup
 
 ### Requirements
@@ -14,15 +28,28 @@ Our project evaluates Iconq bi-LSTM prediction accuracy and IconqSched greedy sc
 - IMDB JOB dataset loaded into local Postgres
 
 ### Environment Setup: Install dependencies
+
 ```bash
 cd <repo-root>
 python3 -m venv .venv
 source .venv/bin/activate        # Mac/Linux
 .venv\Scripts\activate           # Windows
-pip install -r requirements.txt
+python --version
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+Thread stability (recommended on macOS):
+
+```bash
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
 ```
 
 ---
+
 ## Postgres + Dataset Setup
 
 Check DB:
@@ -55,6 +82,23 @@ python utils/load_imdb_csvs_python.py --host 127.0.0.1 --port 5432 --user <user>
 
 ---
 
+## Query File Normalization (Only If Needed)
+
+```bash
+python3 - <<'PY'
+src = "workloads/postgres/brad_queries.sql"
+dst = "workloads/postgres/brad_queries_normalized.sql"
+txt = open(src).read()
+parts = [q.strip() for q in txt.split(";") if q.strip()]
+with open(dst, "w") as f:
+    for q in parts:
+        f.write(q + ";\n\n")
+print("wrote", dst, "queries", len(parts))
+PY
+```
+
+---
+
 ## Running the Pipeline
 
 Follow these steps in order on one designated machine.
@@ -82,6 +126,7 @@ done
 Auto-snapshots are created automatically (`exp_k4_seed*_baseline.csv`).
 
 ### 3. Build clean training folder
+
 ```bash
 rm -rf training_traces_baseline_k4
 mkdir -p training_traces_baseline_k4
@@ -90,7 +135,39 @@ for SEED in 11 12 13 21 22 23 24 25; do
 done
 ```
 
-### 4. Train model
+Optional sanity check (exact sample counts before training):
+
+```bash
+python3 - <<'PY'
+import glob, os
+import pandas as pd
+from utils.load_trace import create_concurrency_dataset
+
+trace_dir = "training_traces_baseline_k4"
+files = sorted(glob.glob(os.path.join(trace_dir, "*.csv")))
+print(f"trace_files={len(files)}")
+for f in files:
+    print(" -", os.path.basename(f))
+
+all_concurrency = []
+for f in files:
+    df = pd.read_csv(f)
+    all_concurrency.append(create_concurrency_dataset(df, engine=None, pre_exec_interval=None))
+
+concurrency_df = pd.concat(all_concurrency, ignore_index=True)
+n = len(concurrency_df)
+train_n = int(0.8 * n)
+eval_n = n - train_n
+eval_concurrent_only = len(concurrency_df.iloc[train_n:][concurrency_df.iloc[train_n:]["num_concurrent_queries"] > 0])
+
+print(f"total_concurrency_samples={n}")
+print(f"approx_train_samples={train_n}")
+print(f"approx_eval_samples={eval_n}")
+print(f"approx_eval_samples_concurrent_only={eval_concurrent_only}")
+PY
+```
+
+### 4. Train Checkpoints
 
 ```bash
 mkdir -p models/_checkpoints
