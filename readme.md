@@ -110,7 +110,7 @@ Do not add `--debug` for timed comparisons.
 ```bash
 for SEED in 11 12 13 21 22 23 24 25; do
   echo "=== Ours seed ${SEED} ==="
-  python -u run.py --run_k_client_in_parallel --database postgres --model_name postgres_brad --target_path models/_checkpoints --rnn_type bilstm --save_result_dir saved_results --host 127.0.0.1 --port 5432 --user  <user> --password <password> --db_name imdb --query_bank_path workloads/postgres/brad_queries_normalized.sql --num_clients 4 --timeout_s 120 --exec_for_s 300 --scheduler_type greedy --seed "${SEED}"
+  python -u run.py --run_k_client_in_parallel --database postgres --model_name postgres_brad --target_path models/_checkpoints --rnn_type bilstm --save_result_dir saved_results --host 127.0.0.1 --port 5432 --user <user> --password <password> --db_name imdb --query_bank_path workloads/postgres/brad_queries_normalized.sql --num_clients 4 --timeout_s 120 --exec_for_s 300 --scheduler_type greedy --seed "${SEED}"
 done
 ```
 
