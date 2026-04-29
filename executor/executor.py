@@ -1,3 +1,4 @@
+#executor/executor.py
 import os
 import pandas as pd
 import psycopg
@@ -37,9 +38,6 @@ async def submit_query_and_wait_for_result(
                         return query_rep, query_idx, 0.0, True, error
                     timeout_ms = int(timeout_s * 1000)
                     await cur.execute(f"set statement_timeout = {timeout_ms};")
-                    await connection.commit()
-                if database is not None and database == "redshift":
-                    await cur.execute("SET enable_result_cache_for_session = OFF;")
                     await connection.commit()
                 t = time.time()
                 try:
@@ -89,8 +87,6 @@ class Executor:
         self.scheduler = scheduler
         self.database_kwargs = database_kwargs
         self.database = database
-        if database == "redshift":
-            os.environ["PGCLIENTENCODING"] = "utf-8"
         self.db_conn = None
         self.timeout = timeout
         self.query_bank = query_bank
@@ -107,9 +103,6 @@ class Executor:
         timeout_ms = int(self.timeout * 1000)
         await acur.execute(f"set statement_timeout = {timeout_ms};")
         await self.db_conn.commit()
-        if self.database == "redshift":
-            await acur.execute("SET enable_result_cache_for_session = OFF;")
-            await self.db_conn.commit()
 
     def get_connection_sync(self) -> psycopg.cursor:
         db_conn = psycopg.connect(**self.database_kwargs)
@@ -117,9 +110,6 @@ class Executor:
         timeout_ms = int(self.timeout * 1000)
         cur.execute(f"set statement_timeout = {timeout_ms};")
         db_conn.commit()
-        if self.database == "redshift":
-            cur.execute("SET enable_result_cache_for_session = OFF;")
-            db_conn.commit()
         return cur
 
     def replay_one_query(

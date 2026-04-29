@@ -1,6 +1,8 @@
+#run.py
 import argparse
 import os.path
 import asyncio
+#asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy()) # Added for Windows compatibility, uncomment it when needed.
 import shutil
 from typing import Union, Tuple, Optional
 import pandas as pd
@@ -25,7 +27,7 @@ from scheduler.linear_programming_scheduler import LPScheduler
 from simulator.simulator import Simulator
 from executor.executor import Executor
 from utils.logging import create_custom_logger
-from workloads.workload_tools.mimic_trace import pre_process_snowset, TraceManager
+#from workloads.workload_tools.mimic_trace import pre_process_snowset, TraceManager
 
 np.set_printoptions(suppress=True)
 

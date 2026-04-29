@@ -14,9 +14,9 @@ Our project evaluates Iconq bi-LSTM prediction accuracy and IconqSched greedy sc
 4. Build clean training folder from baseline CSVs only.
 5. Train checkpoints.
 6. Run ours on the same seeds and same config.
-7. Run Exp1 and Exp2.
+7. Run Experiment 1 and Experiment 2.
 
-Core rule: use one checkpoint set for both Experiment 1 and Experiment 2 in one report cycle.
+Use one checkpoint set for both Experiment 1 and Experiment 2 in one report cycle.
 
 ---
 
@@ -179,7 +179,7 @@ Expected artifacts:
 - `models/_checkpoints/postgres_brad_stage_model.pkl`
 - `models/_checkpoints/postgres_brad_bilstm_256_2_q_loss_wo_sep`
 
-### 5. Run IconqSched seeds 
+### 5. Run IconqSched seeds (Ours)
 
 Ours runs with same seeds and same configuration.
 Do not add `--debug` for timed comparisons.
@@ -211,6 +211,20 @@ Note: `--seeds` must be space-separated integers (not comma-separated).
 
 ---
 
+### If You Want To Re-run Later
+
+If you want similarly strong results again, repeat the full cycle:
+
+1. Baseline seeds  
+2. Clean training folder rebuild 
+3. Retrain checkpoints 
+4. Ours seeds 
+5. Experiment 1 + Experiment 2
+
+No need to rerun warmup unless DB/session state changed.
+
+---
+
 ## Metrics
 
 **Experiment 1 — Predictor Accuracy**
@@ -234,3 +248,4 @@ Note: `--seeds` must be space-separated integers (not comma-separated).
 - Do not mix old CSVs into `training_traces_baseline_k4`.
 - Clear Postgres cache between runs for consistent results.
 - Do not mix checkpoint sets across Experiment1 and Experiment2 in one report cycle.
+- If results look off, redo from step 2 (baseline seeds) with a fresh clean cycle.
