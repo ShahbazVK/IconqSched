@@ -9,11 +9,7 @@ import pandas as pd
 import numpy as np
 import copy
 import pickle as pkl
-from utils.load_trace import (
-    create_concurrency_dataset,
-    load_trace_all_version,
-    load_all_csv_from_dir,
-)
+from utils.load_trace import create_concurrency_dataset, load_all_csv_from_dir
 from models.single.stage import SingleStage
 from models.concurrency.complex_models import ConcurrentRNN
 from scheduler.greedy_scheduler import GreedyScheduler
@@ -25,14 +21,8 @@ np.set_printoptions(suppress=True)
 
 def load_workload(
     train_test_split: bool = True,
-    load_csv: bool = True,
 ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.DataFrame]]:
-    if load_csv:
-        all_trace = load_all_csv_from_dir(args.directory)
-    else:
-        _, all_trace = load_trace_all_version(
-            args.directory, args.num_clients, concat=True
-        )
+    all_trace = load_all_csv_from_dir(args.directory)
     all_concurrency_df = []
     for trace in all_trace:
         concurrency_df = create_concurrency_dataset(

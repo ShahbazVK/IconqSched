@@ -3,7 +3,6 @@ import pandas as pd
 import os
 import copy
 from typing import List, Union, Optional, Tuple
-from parser.utils import load_json, get_touched_tables
 
 
 def load_trace(
@@ -82,40 +81,6 @@ def load_all_csv_from_dir(directory: str) -> List[pd.DataFrame]:
             df = df[df["run_time_s"] > 0]
             if "error" in df.columns:
                 df = df[df["error"] == False]
-            all_trace.append(df)
-    return all_trace
-
-
-def load_trace_all_version(
-    directory: str, num_client: int = 10, concat: bool = True
-) -> Union[
-    Tuple[pd.DataFrame, pd.DataFrame], Tuple[List[pd.DataFrame], List[pd.DataFrame]]
-]:
-    exist_versions = []
-    for v in range(2, 20):
-        if os.path.exists(os.path.join(directory, f"trace_client_0_{v}.csv")):
-            exist_versions.append(v)
-        elif os.path.exists(os.path.join(directory, f"repeating_olap_batch_0_{v}.csv")):
-            exist_versions.append(v)
-    all_raw_trace = []
-    all_trace = []
-    raw_trace, trace = load_trace(directory, num_client, concat, version=None)
-    all_raw_trace.append(raw_trace)
-    all_trace.append(trace)
-    for v in exist_versions:
-        raw_trace, trace = load_trace(directory, num_client, concat, version=v)
-        all_raw_trace.append(raw_trace)
-        all_trace.append(trace)
-    return all_raw_trace, all_trace
-
-
-def load_all_trace_from_dir(directory: str) -> List[pd.DataFrame]:
-    all_trace = []
-    for file in os.listdir(directory):
-        if file.endswith(".csv"):
-            file = os.path.join(directory, file)
-            df = pd.read_csv(file)
-            df = df[df["run_time_s"] > 0]
             all_trace.append(df)
     return all_trace
 
@@ -217,21 +182,3 @@ def create_concurrency_dataset(
             concurrency_df[col] = trace[col]
     concurrency_df = concurrency_df.reset_index()
     return concurrency_df
-
-
-def get_number_join_per_query(
-    df: pd.DataFrame,
-    parsed_queries_path: str,
-) -> pd.DataFrame:
-    plans = load_json(parsed_queries_path, namespace=False)
-    num_joins_per_query = []
-    for i in range(len(plans["parsed_plans"])):
-        tables = get_touched_tables(plans["sql_queries"][i])
-        num_joins_per_query.append(len(tables))
-
-    num_joins = np.zeros(len(df))
-    for i in range(len(df)):
-        query_idx = int(df["query_idx"].iloc[i])
-        num_joins[i] = num_joins_per_query[query_idx]
-    df["num_joins"] = num_joins
-    return df
