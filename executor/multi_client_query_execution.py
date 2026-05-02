@@ -79,9 +79,6 @@ def runner(
             sslrootcert="SSLCERTIFICATE",
         )
         cur = conn.cursor()
-        if args.engine == "redshift":
-            cur.execute("SET enable_result_cache_for_session = OFF;")
-            conn.commit()
     except:
         print(f"[RA {runner_idx}] Failed to connect to engine:")
         start_queue.put_nowait(STARTUP_FAILED)
@@ -172,12 +169,8 @@ def runner(
                     )
                 else:
                     time_unsimulated_str = "xxx"
-                if args.engine == "aurora" or args.engine == "postgres":
-                    cur.execute("SET statement_timeout to 1000000;")
-                    conn.commit()
-                elif args.engine == "redshift":
-                    cur.execute("set statement_timeout = 1000000;")
-                    conn.commit()
+                cur.execute("SET statement_timeout TO 1000000;")
+                conn.commit()
                 start = time.time()
                 try:
                     cur.execute(query)
@@ -229,9 +222,6 @@ def runner(
                     sslrootcert="SSLCERTIFICATE",
                 )
                 cur = conn.cursor()
-                if args.engine == "redshift":
-                    cur.execute("SET enable_result_cache_for_session = OFF;")
-                    conn.commit()
 
     finally:
         os.fsync(file.fileno())
@@ -250,9 +240,6 @@ def run_warmup(args, query_bank: List[str], queries: List[int]):
         sslrootcert="SSLCERTIFICATE",
     )
     cur = conn.cursor()
-    if args.engine == "redshift":
-        cur.execute("SET enable_result_cache_for_session = OFF;")
-        conn.commit()
 
     # For printing out results.
     if "COND_OUT" in os.environ:
@@ -280,12 +267,8 @@ def run_warmup(args, query_bank: List[str], queries: List[int]):
                     try:
                         query = query_bank[qidx]
                         now = datetime.now().astimezone(pytz.utc)
-                        if args.engine == "aurora" or args.engine == "postgres":
-                            cur.execute("SET statement_timeout to 1000000;")
-                            conn.commit()
-                        elif args.engine == "redshift":
-                            cur.execute("set statement_timeout = 1000000;")
-                            conn.commit()
+                        cur.execute("SET statement_timeout TO 1000000;")
+                        conn.commit()
                         start = time.time()
                         cur.execute(query)
                         cur.fetchall()
@@ -324,9 +307,6 @@ def run_warmup(args, query_bank: List[str], queries: List[int]):
                             sslrootcert="SSLCERTIFICATE",
                         )
                         cur = conn.cursor()
-                        if args.engine == "redshift":
-                            cur.execute("SET enable_result_cache_for_session = OFF;")
-                            conn.commit()
     finally:
         conn.close()
 

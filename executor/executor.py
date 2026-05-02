@@ -12,9 +12,7 @@ from utils.load_trace import (
     create_concurrency_dataset,
 )
 from scheduler.base_scheduler import BaseScheduler
-from scheduler.pgm_scheduler import PGMScheduler
-from scheduler.qshuffler_scheduler import QShuffler
-from simulator.simulator import QueryBank
+
 logger = logging.getLogger(__name__)
 
 
@@ -72,8 +70,7 @@ class Executor:
         database_kwargs: Mapping[str, Union[str, int]],
         timeout: int,
         database: str,
-        scheduler: Optional[Union[BaseScheduler, PGMScheduler, QShuffler]],
-        query_bank: Optional[QueryBank] = None,
+        scheduler: Optional[BaseScheduler],
         pause_wait_s: float = 5.0,
         debug: bool = False,
         logger: Optional[logging.Logger] = None,
@@ -89,7 +86,6 @@ class Executor:
         self.database = database
         self.db_conn = None
         self.timeout = timeout
-        self.query_bank = query_bank
         self.pause_wait_s = pause_wait_s
         self.pending_jobs = []
         self.debug = debug

@@ -303,9 +303,6 @@ def parse_one_plan_online(
     )
     verbose_plan.tables = tables
     verbose_plan.num_tables = len(tables)
-    if database == 'redshift':
-        # the redshift explain is not clean, we will process it by removing the internal tables.
-        verbose_plan = verbose_plan.post_processing_redshift_plan(sql, True)
     return verbose_plan
 
 
@@ -339,25 +336,11 @@ def get_query_plans(query_file: str,
     column_stats = transform_dicts(column_stats_names, column_stats_rows)
     database_stats['column_stats'] = column_stats
 
-    if database == "redshift":
-        table_stats_query = """SELECT relname, reltuples, relpages from pg_class 
-                               WHERE relkind = 'r' 
-                               AND relname NOT LIKE 'pg_%' 
-                               AND relname NOT LIKE 'sql_%'
-                               AND relname NOT LIKE 'stll_%'
-                               AND relname NOT LIKE 'stcs_%'
-                               AND relname NOT LIKE 'stv_%'
-                               AND relname NOT LIKE 'sys%'
-                               AND relname NOT LIKE 'padb%'
-                               AND relname NOT LIKE 'mv_%'
-                               ;"""
-        verbose = False
-    else:
-        table_stats_query = """SELECT relname, reltuples, relpages from pg_class 
-                               WHERE relkind = 'r' 
-                               AND relname NOT LIKE 'pg_%' 
-                               AND relname NOT LIKE 'sql_%';"""
-        verbose = True
+    table_stats_query = """SELECT relname, reltuples, relpages from pg_class 
+                           WHERE relkind = 'r' 
+                           AND relname NOT LIKE 'pg_%' 
+                           AND relname NOT LIKE 'sql_%';"""
+    verbose = True
     with db_conn.cursor() as cur:
         cur.execute(table_stats_query)
         table_stats_rows = cur.fetchall()
